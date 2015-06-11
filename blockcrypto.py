@@ -220,6 +220,37 @@ def newpadoracle(blackbox,blocksize,totalbytes,key, offset=0, ourblock=0):
        #print outs,b
     return "".join(outs)
 
+#Q15
+
+class MyException(Exception):
+    pass
+
+def unpad2(s):
+    n=s[-1:]
+    i=ord(n)
+    if all(map(lambda x: x==n, s[-i:])):
+        return s[:-i]
+    else:
+        raise MyException("Bad Padding!")
+
+#Q16
+import string
+def f1(s,key,iv):
+    s=s.replace("=","")
+    s=s.replace("&","")
+    s=s.replace(";","")
+    news = pad("comment1=cooking%20MCs;userdata=" + s + ";comment2=%20like%20a%20pound%20of%20bacon", 16)
+    return encryptCBCAES(key,news, iv)
+
+def f2(s,key,iv):
+    s=decryptCBCAES(key,s,iv)
+    #print s
+    #print [s[i:i+16] for i in range(0, len(s), 16)]
+    if string.find(s,";admin=true;")!=-1:
+        return (True,s)
+    else:
+        return (False,s)
+
 
 if __name__=='__main__':
     #Q9
@@ -267,4 +298,24 @@ if __name__=='__main__':
     print "Prefix length: " + str(lengthprefix)
     print "Message: "
     print unpad(newpadoracle(myoracle, 16,len(myoracle(globalkey,"")), globalkey, offset=offset, ourblock=ourblock ))
-    
+    #Q15
+    print "Q15"
+    print unpad2("ICE ICE BABY\x04\x04\x04\x04")
+    try:
+        print unpad2("ICE ICE BABY\x05\x05\x05\x05")
+    except Exception as e:
+        print e
+
+    try:
+        print unpad2("ICE ICE BABY\x01\x02\x03\x04")
+    except Exception as e:
+        print e
+
+    #Q16
+    print "Q16"
+    globalkey=randomkey(16)
+    iv = randomkey(16)
+    test=f1("AadminAtrue", globalkey, iv)
+    test=test[:16]+chr(ord("A")^ord(";")^ord(test[16])) + test[17:]
+    test=test[:16+6] + chr(ord("A")^ord("=")^ord(test[16+6])) + test[16+7:]
+    print f2(test,globalkey,iv)
