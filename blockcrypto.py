@@ -156,9 +156,71 @@ def create_profile(key,ct):
     d=parse2dict(out)
     return d
 
+#Q14
+def myoracle(key,attack):
+    global rprefix
+    return encryptECBAES(key,pad(rprefix+attack+"decryptme",16))
+
+import numpy as np
+
+def wherearewe(blackbox, key):
+    #return offset to block
+    pastblocks=np.zeros(16)
+    blocksnoinput = splitblocks(blackbox(key,""), 16)
+    blocksonebyte=splitblocks(blackbox(key,"A"), 16)
+    #numsameorig=np.sum(np.array(blocksnoinput)==np.array(blocksonebyte))
+    numsameorig=len(set(blocksnoinput).intersection(set(blocksonebyte)))
+    for b in xrange(1,18):
+        blocks = splitblocks(blackbox(key,"A"*b), 16)
+        #numsame=np.sum(np.array(blocksnoinput)==np.array(blocks))
+        numsame=len(set(blocks).intersection(set(pastblocks)))
+        if numsame>numsameorig:
+            return ((b-1)%16, np.max(np.where(np.array(blocks[:len(pastblocks)])==np.array(pastblocks)) ))
+        pastblocks=blocks
+    return None
 
 
-    
+def newcreatedict(blackbox, key,blocksize,curblock=0,byte=1,knownletters=[], offset=0):
+    d={}
+    z=(curblock*blocksize)
+    #print z, z+blocksize, byte
+    #print ascii2hex(blackbox(key,("A"*((blocksize-1)+offset))+"&"))
+    #print ':'.join(x.encode('hex') for x in blackbox(key,("A"*((blocksize-2)+offset))+"=u")[16:32])
+    for a in xrange(0,128):
+        #print ("A"*((blocksize-byte)))+"".join(knownletters)+chr(a)
+        d[blackbox(key,("A"*((blocksize-byte)+offset))+"".join(knownletters)+chr(a))[z:z+blocksize]]=chr(a)
+    #print ("A"*((blocksize-byte)))+"".join(knownletters)+chr(a)
+    return d
+
+
+def newpadoracle(blackbox,blocksize,totalbytes,key, offset=0, ourblock=0):
+    outs=[]
+    knownletters=[]
+    for b in xrange((ourblock+1),(totalbytes/blocksize)+1):
+        o=""
+        for byte in xrange(1,blocksize+1):
+            #print b,byte,offset,blocksize,((blocksize-byte)+offset)
+            #print b*blocksize, (b+1)*blocksize
+            #print blackbox(key, "A"*((blocksize-1)+offset))
+            #print ':'.join(x.encode('hex') for x in blackbox(key, "A"*((blocksize-2)+offset)+"=")[16:32])
+
+            onebyteshort=blackbox(key, "A"*((blocksize-byte)+offset))
+            d=newcreatedict(blackbox,key,blocksize,curblock=b,byte=byte,knownletters=knownletters, offset=offset)
+            #print d
+            #print d
+            try: #TODO: Hack for last byte
+                knownletters.append(d[onebyteshort[b*blocksize:(b+1)*blocksize]])
+                o+=d[onebyteshort[b*blocksize:(b+1)*blocksize]]
+                #print o
+            except Exception as e:
+                #print e
+                pass
+           # print o, b
+        outs.append(o)
+       #print outs,b
+    return "".join(outs)
+
+
 if __name__=='__main__':
     #Q9
     print "Q9"
@@ -166,7 +228,7 @@ if __name__=='__main__':
     #Q10
     print "Q10"
     ct=""
-    f=open("10.txt","r")
+    f=open("blockcrypto/10.txt","r")
     for line in f:
         ct+=line.strip()
     f.close()
@@ -194,3 +256,15 @@ if __name__=='__main__':
     ct3=ct2
     ct4=ct2[:32]+ct1[16:32]
     print create_profile(globalkey,ct4)
+    #Q14
+    print "Q14"
+    globalkey=randomkey(16)
+    import random
+    rcount=random.randint(1,64)
+    rprefix=randomkey(rcount)
+    (offset,ourblock) =wherearewe(myoracle,globalkey)
+    lengthprefix = (ourblock)*16 + (16-offset)
+    print "Prefix length: " + str(lengthprefix)
+    print "Message: "
+    print unpad(newpadoracle(myoracle, 16,len(myoracle(globalkey,"")), globalkey, offset=offset, ourblock=ourblock ))
+    
